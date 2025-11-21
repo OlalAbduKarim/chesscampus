@@ -100,7 +100,7 @@ export const Sidebar: React.FC<NavigationProps> = ({ activePage, onNavigate }) =
   ];
 
   return (
-    <div className={`flex flex-col bg-dark-surface border-r border-dark-border transition-all duration-300 h-full ${isCollapsed ? 'w-16' : 'w-64'}`}>
+    <div className={`hidden md:flex flex-col bg-dark-surface border-r border-dark-border transition-all duration-300 h-full ${isCollapsed ? 'w-16' : 'w-64'}`}>
       <div className="flex-1 py-6 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -142,6 +142,36 @@ export const Sidebar: React.FC<NavigationProps> = ({ activePage, onNavigate }) =
           )}
         </button>
       </div>
+    </div>
+  );
+};
+
+export const BottomNav: React.FC<NavigationProps> = ({ activePage, onNavigate }) => {
+  const navItems = [
+    { id: Page.STREAM_HUB, label: 'Streams', icon: Tv },
+    { id: Page.FORUM, label: 'Community', icon: Users },
+    { id: Page.PLAY_AREA, label: 'Play', icon: LayoutDashboard },
+    { id: Page.PRIVATE_LESSON, label: 'Lesson', icon: GraduationCap },
+  ];
+
+  return (
+    <div className="md:hidden h-16 bg-dark-surface border-t border-dark-border flex items-center justify-around px-2 fixed bottom-0 left-0 right-0 z-30 safe-area-pb">
+      {navItems.map((item) => {
+        const Icon = item.icon;
+        const isActive = activePage === item.id;
+        return (
+          <button
+            key={item.id}
+            onClick={() => onNavigate(item.id)}
+            className={`flex flex-col items-center justify-center p-2 w-full transition-colors
+              ${isActive ? 'text-brand-400' : 'text-slate-500'}
+            `}
+          >
+            <Icon className={`w-6 h-6 mb-1 ${isActive ? 'text-brand-400' : 'text-slate-500'}`} />
+            <span className="text-[10px] font-medium">{item.label}</span>
+          </button>
+        );
+      })}
     </div>
   );
 };

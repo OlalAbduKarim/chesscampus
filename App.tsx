@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TopBar, Sidebar } from './components/Navigation';
+import { TopBar, Sidebar, BottomNav } from './components/Navigation';
 import StreamHub from './pages/StreamHub';
 import Forum from './pages/Forum';
 import PlayArea from './pages/PlayArea';
@@ -28,11 +28,15 @@ const AppContent: React.FC = () => {
   return (
     <div className="flex flex-col h-screen bg-dark-bg text-slate-200 font-sans">
       <TopBar />
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
         <Sidebar activePage={activePage} onNavigate={setActivePage} />
-        <main className="flex-1 overflow-hidden relative bg-dark-bg">
+        
+        {/* Main Content - Added pb-16 for mobile bottom nav spacing */}
+        <main className="flex-1 overflow-hidden relative bg-dark-bg flex flex-col pb-16 md:pb-0">
           {renderPage()}
         </main>
+
+        <BottomNav activePage={activePage} onNavigate={setActivePage} />
       </div>
     </div>
   );

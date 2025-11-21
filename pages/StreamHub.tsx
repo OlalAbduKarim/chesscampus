@@ -117,7 +117,7 @@ const LiveChat: React.FC<{ stream: Streamer }> = ({ stream }) => {
     };
 
     return (
-        <div className="flex flex-col h-full bg-dark-surface border-l border-dark-border">
+        <div className="flex flex-col h-full bg-dark-surface md:border-l border-dark-border">
             <div className="p-4 border-b border-dark-border flex justify-between items-center bg-dark-surface shadow-sm z-10">
                 <div className="font-semibold text-slate-200 flex items-center gap-2 text-sm">
                     <MessageSquare className="w-4 h-4 text-brand-400" /> 
@@ -173,26 +173,27 @@ const LiveChat: React.FC<{ stream: Streamer }> = ({ stream }) => {
 
 const StreamPlayerModal: React.FC<{ stream: Streamer; onClose: () => void }> = ({ stream, onClose }) => {
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="w-full h-full md:h-[90vh] md:w-[95vw] max-w-[1800px] bg-dark-bg md:rounded-xl overflow-hidden flex flex-col md:flex-row border border-dark-border shadow-2xl relative">
+        <div className="fixed inset-0 z-50 flex flex-col md:flex-row md:items-center md:justify-center bg-black/95 backdrop-blur-md animate-in fade-in duration-200 overflow-hidden">
+          <div className="w-full h-full md:h-[90vh] md:w-[95vw] max-w-[1800px] bg-dark-bg md:rounded-xl overflow-hidden flex flex-col md:flex-row border-0 md:border border-dark-border shadow-2xl relative">
             
-            {/* Close Button Mobile */}
-            <button 
-                onClick={onClose}
-                className="md:hidden absolute top-2 right-2 z-30 p-2 bg-black/50 text-white rounded-full backdrop-blur-sm"
-            >
-                <X className="w-5 h-5" />
-            </button>
-
             {/* Main Content */}
-            <div className="flex-1 flex flex-col relative group bg-black">
+            <div className="w-full h-[40vh] md:h-auto md:flex-1 flex flex-col relative group bg-black flex-shrink-0">
+                
+                {/* Close Button Mobile - Overlay on video */}
+                <button 
+                    onClick={onClose}
+                    className="md:hidden absolute top-4 right-4 z-30 p-2 bg-black/50 text-white rounded-full backdrop-blur-sm hover:bg-white/20 transition-colors"
+                >
+                    <X className="w-5 h-5" />
+                </button>
+
                 {/* Video Placeholder */}
                 <div className="flex-1 relative flex items-center justify-center overflow-hidden">
                     <img src={stream.thumbnail} className="w-full h-full object-cover opacity-60 blur-sm absolute inset-0" alt="Background" />
                     <img src={stream.thumbnail} className="w-full h-full object-contain relative z-10 shadow-2xl" alt="Stream" />
                     
-                    {/* Overlay UI */}
-                    <div className="absolute top-0 left-0 w-full p-4 bg-gradient-to-b from-black/80 to-transparent z-20 flex justify-between items-start opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    {/* Overlay UI Desktop */}
+                    <div className="hidden md:flex absolute top-0 left-0 w-full p-4 bg-gradient-to-b from-black/80 to-transparent z-20 justify-between items-start opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                         <div className="flex items-center gap-3">
                              <img src={stream.avatar} className="w-10 h-10 rounded-full border-2 border-brand-500 shadow-lg" alt="Avatar" />
                              <div>
@@ -205,27 +206,37 @@ const StreamPlayerModal: React.FC<{ stream: Streamer; onClose: () => void }> = (
                                  </p>
                              </div>
                         </div>
-                        <button onClick={onClose} className="hidden md:block p-2 hover:bg-white/20 rounded-full text-white transition-colors">
+                        <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-full text-white transition-colors">
                              <X className="w-6 h-6" />
                         </button>
                     </div>
 
                     {/* Bottom Controls Placeholder */}
-                    <div className="absolute bottom-0 left-0 w-full p-4 bg-gradient-to-t from-black/90 to-transparent z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex justify-between items-center">
+                    <div className="absolute bottom-0 left-0 w-full p-4 bg-gradient-to-t from-black/90 to-transparent z-20 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300 flex justify-between items-center">
                          <div className="flex items-center gap-4 text-white">
                              <button className="hover:text-brand-400 transition-colors"><Heart className="w-6 h-6" /></button>
                              <button className="hover:text-brand-400 transition-colors"><Share2 className="w-6 h-6" /></button>
                              <button className="hover:text-white text-slate-300 transition-colors"><MoreHorizontal className="w-6 h-6" /></button>
                          </div>
                          <div className="text-slate-300 text-sm font-mono">
-                             <span className="text-red-500 font-bold">●</span> {stream.viewers.toLocaleString()} Viewers
+                             <span className="text-red-500 font-bold">●</span> {stream.viewers.toLocaleString()}
                          </div>
                     </div>
                 </div>
             </div>
 
+            {/* Mobile Header Info (Below Video) */}
+            <div className="md:hidden p-3 bg-dark-surface border-b border-dark-border flex items-center gap-3 flex-shrink-0">
+                 <img src={stream.avatar} className="w-8 h-8 rounded-full border border-brand-500" alt="Avatar" />
+                 <div className="min-w-0 flex-1">
+                     <h2 className="text-white font-bold text-sm truncate">{stream.title}</h2>
+                     <p className="text-brand-400 text-xs">{stream.name}</p>
+                 </div>
+                 <span className="bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded font-bold">LIVE</span>
+            </div>
+
             {/* Chat Sidebar */}
-            <div className="w-full md:w-[350px] lg:w-[400px] h-[40vh] md:h-full flex-shrink-0 relative z-20">
+            <div className="flex-1 md:w-[350px] lg:w-[400px] md:h-full relative z-20 min-h-0 flex flex-col">
                 <LiveChat stream={stream} />
             </div>
           </div>
@@ -265,11 +276,11 @@ const StreamHub: React.FC = () => {
   return (
     <div className="h-full flex flex-col overflow-hidden bg-dark-bg">
       {/* Header */}
-      <div className="p-6 md:px-8 md:py-6 border-b border-dark-border bg-dark-surface/50 backdrop-blur-sm sticky top-0 z-10 flex-shrink-0">
+      <div className="p-4 md:p-6 border-b border-dark-border bg-dark-surface/50 backdrop-blur-sm sticky top-0 z-10 flex-shrink-0">
          <div className="flex justify-between items-end">
              <div>
-                <h1 className="text-2xl font-bold text-white tracking-tight">Stream Hub</h1>
-                <p className="text-slate-400 text-sm mt-1">Watch top Grandmasters and personalities live.</p>
+                <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">Stream Hub</h1>
+                <p className="text-slate-400 text-xs md:text-sm mt-1">Watch top Grandmasters and personalities live.</p>
              </div>
              <div className="hidden sm:flex gap-2">
                  <button className="px-3 py-1.5 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-500 transition-colors shadow-lg shadow-brand-900/20">
@@ -283,8 +294,8 @@ const StreamHub: React.FC = () => {
       </div>
 
       {/* Grid Container */}
-      <div className="flex-1 overflow-y-auto p-6 md:p-8">
-         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+      <div className="flex-1 overflow-y-auto p-4 md:p-8">
+         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 md:gap-6">
             {streams.map(stream => (
                 <StreamCard 
                     key={stream.id} 
@@ -294,12 +305,12 @@ const StreamHub: React.FC = () => {
             ))}
          </div>
          
-         <div className="mt-12 mb-8 border-t border-dark-border pt-8">
-            <h3 className="text-xl font-bold text-white mb-4">Recommended Categories</h3>
+         <div className="mt-8 md:mt-12 mb-8 border-t border-dark-border pt-8">
+            <h3 className="text-lg md:text-xl font-bold text-white mb-4">Recommended Categories</h3>
             <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
                 {['Blitz', 'Rapid', 'Bullet', 'Instructional', 'Tournament', 'Casual'].map(cat => (
-                    <div key={cat} className="flex-shrink-0 w-40 h-24 bg-dark-surface border border-dark-border rounded-lg flex items-center justify-center hover:border-brand-500 hover:bg-brand-900/10 cursor-pointer transition-all group">
-                        <span className="font-bold text-slate-400 group-hover:text-brand-400 transition-colors">{cat}</span>
+                    <div key={cat} className="flex-shrink-0 w-32 md:w-40 h-20 md:h-24 bg-dark-surface border border-dark-border rounded-lg flex items-center justify-center hover:border-brand-500 hover:bg-brand-900/10 cursor-pointer transition-all group">
+                        <span className="font-bold text-slate-400 group-hover:text-brand-400 transition-colors text-sm md:text-base">{cat}</span>
                     </div>
                 ))}
             </div>

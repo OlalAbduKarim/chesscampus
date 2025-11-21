@@ -286,16 +286,21 @@ const PlayArea: React.FC = () => {
   return (
     <div className="h-full flex flex-col lg:flex-row overflow-hidden bg-dark-bg">
       {/* LEFT: BOARD AREA */}
-      <div className="flex-1 flex flex-col relative">
+      <div className="flex-1 flex flex-col relative overflow-y-auto lg:overflow-hidden">
           
-          {/* Mobile Status */}
-          <div className="lg:hidden p-3 bg-dark-surface border-b border-dark-border flex justify-between items-center">
-              <span className="font-bold text-sm text-white truncate max-w-[50%]">{gameStatus}</span>
-              {isGameActive && <Timer time={actualPlayerColor === 'w' ? blackTime : whiteTime} isActive={game.turn() !== actualPlayerColor} label="CPU" />}
+          {/* Mobile Status & Timers */}
+          <div className="lg:hidden p-3 bg-dark-surface border-b border-dark-border flex justify-between items-center sticky top-0 z-20 shadow-md">
+              <span className="font-bold text-sm text-white truncate max-w-[40%]">{gameStatus}</span>
+              {isGameActive && (
+                <div className="flex gap-2">
+                    <Timer time={actualPlayerColor === 'w' ? whiteTime : blackTime} isActive={game.turn() === actualPlayerColor} label="YOU" />
+                    <Timer time={actualPlayerColor === 'w' ? blackTime : whiteTime} isActive={game.turn() !== actualPlayerColor} label="CPU" />
+                </div>
+              )}
           </div>
 
-          <div className="flex-1 bg-dark-bg flex items-center justify-center p-4 relative">
-            <div className="w-full max-w-[65vh] flex flex-col gap-3">
+          <div className="flex-1 bg-dark-bg flex flex-col items-center p-4 relative">
+            <div className="w-full md:max-w-[70vh] lg:max-w-[65vh] flex flex-col gap-3">
                 
                 {/* CPU Info (Desktop) */}
                 <div className="hidden lg:flex justify-between items-end px-1">
@@ -315,7 +320,7 @@ const PlayArea: React.FC = () => {
                 </div>
 
                 {/* BOARD */}
-                <div className="aspect-square shadow-2xl shadow-black rounded-lg overflow-hidden border-4 border-dark-surface relative group">
+                <div className="w-full aspect-square shadow-2xl shadow-black rounded-lg overflow-hidden border-4 border-dark-surface relative group">
                     <Chessboard 
                         position={game.fen()} 
                         onPieceDrop={onDrop}
@@ -362,17 +367,17 @@ const PlayArea: React.FC = () => {
       </div>
 
       {/* RIGHT: CONTROLS & ANALYSIS */}
-      <div className="w-full lg:w-[380px] bg-dark-surface border-l border-dark-border flex flex-col h-[45vh] lg:h-full z-10">
-          <div className="p-5 border-b border-dark-border flex items-center gap-2 font-bold text-white">
+      <div className="w-full lg:w-[380px] bg-dark-surface border-t lg:border-t-0 lg:border-l border-dark-border flex flex-col h-auto lg:h-full z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] lg:shadow-none">
+          <div className="p-4 md:p-5 border-b border-dark-border flex items-center gap-2 font-bold text-white">
               <Swords className="w-5 h-5 text-brand-500" />
               {isGameActive ? "Match Info" : "Game Setup"}
           </div>
 
-          <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto p-4 md:p-5 custom-scrollbar max-h-[40vh] lg:max-h-none">
               {isGameActive ? (
                   <div className="space-y-6">
-                      {/* Status Box */}
-                      <div className="bg-dark-bg rounded-xl p-4 border border-dark-border">
+                      {/* Status Box (Hidden Mobile - shown in top bar) */}
+                      <div className="hidden lg:block bg-dark-bg rounded-xl p-4 border border-dark-border">
                           <div className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Status</div>
                           <div className="text-lg font-bold text-white">{gameStatus}</div>
                           {game.inCheck() && !game.isGameOver() && (
@@ -398,7 +403,7 @@ const PlayArea: React.FC = () => {
                       </div>
 
                       {/* Move History */}
-                      <div className="bg-dark-bg rounded-xl border border-dark-border overflow-hidden flex flex-col h-48">
+                      <div className="bg-dark-bg rounded-xl border border-dark-border overflow-hidden flex flex-col h-32 md:h-48">
                            <div className="px-3 py-2 bg-dark-surface/50 border-b border-dark-border text-xs font-bold text-slate-500 uppercase">Move History</div>
                            <div className="flex-1 overflow-y-auto p-2 font-mono text-sm">
                                <div className="grid grid-cols-[30px_1fr_1fr] gap-y-1">
@@ -486,7 +491,7 @@ const PlayArea: React.FC = () => {
 
                       <button 
                         onClick={startGame}
-                        className="w-full bg-brand-600 hover:bg-brand-500 text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-brand-900/20 flex items-center justify-center gap-2 transition-transform active:scale-95"
+                        className="w-full bg-brand-600 hover:bg-brand-500 text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-brand-900/20 flex items-center justify-center gap-2 transition-transform active:scale-95 mb-8"
                       >
                           <Play className="w-5 h-5 fill-current" /> Start Match
                       </button>
