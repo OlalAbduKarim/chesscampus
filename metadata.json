@@ -1,0 +1,8 @@
+{
+  "name": "ChessCampus",
+  "description": "A modern, integrated chess learning platform featuring live streams, community forums, AI-powered game analysis, and private interactive lessons.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
