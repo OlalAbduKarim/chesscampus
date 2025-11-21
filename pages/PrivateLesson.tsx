@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Mic, MicOff, Video, VideoOff, PhoneOff, MessageSquare } from 'lucide-react';
 import { Chess } from 'chess.js';
@@ -50,7 +51,7 @@ const PrivateLesson: React.FC = () => {
   }
 
   return (
-    <div className="h-full flex flex-col p-4 gap-4 overflow-y-auto">
+    <div className="h-full flex flex-col p-4 gap-4 overflow-y-auto pb-20 lg:pb-4">
       <header className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-white">Private Lesson</h2>

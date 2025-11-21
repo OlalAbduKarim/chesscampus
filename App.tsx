@@ -31,8 +31,8 @@ const AppContent: React.FC = () => {
       <div className="flex flex-1 overflow-hidden relative">
         <Sidebar activePage={activePage} onNavigate={setActivePage} />
         
-        {/* Main Content - Added pb-16 for mobile bottom nav spacing */}
-        <main className="flex-1 overflow-hidden relative bg-dark-bg flex flex-col pb-16 md:pb-0">
+        {/* Main Content - Removed global pb-16 to allow pages to handle scrolling and safe areas internally */}
+        <main className="flex-1 overflow-hidden relative bg-dark-bg flex flex-col">
           {renderPage()}
         </main>
 

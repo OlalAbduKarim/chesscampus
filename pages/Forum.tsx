@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   MessageSquare, Eye, Tag, Plus, ThumbsUp, 
@@ -327,7 +328,7 @@ const Forum: React.FC = () => {
                 </div>
 
                 {/* Content Body */}
-                <div className="flex-1 overflow-y-auto p-4 md:p-6 scroll-smooth">
+                <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-20 md:pb-6 scroll-smooth">
                     
                     {/* THREAD LIST VIEW */}
                     {!activeThread ? (
@@ -386,7 +387,7 @@ const Forum: React.FC = () => {
                         </div>
                     ) : (
                         /* THREAD DETAIL VIEW */
-                        <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-300">
+                        <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-300 pb-20">
                             
                             {/* Original Post */}
                             <div className="bg-dark-surface border border-dark-border rounded-xl p-4 md:p-6 mb-6 shadow-xl">

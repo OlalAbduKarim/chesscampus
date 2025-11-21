@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Heart, Share2, MessageSquare, X, Send, Users as UsersIcon, MoreHorizontal, Gift, Smile } from 'lucide-react';
 import { Streamer, ChatMessage } from '../types';
@@ -294,7 +295,7 @@ const StreamHub: React.FC = () => {
       </div>
 
       {/* Grid Container */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-8">
+      <div className="flex-1 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8">
          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 md:gap-6">
             {streams.map(stream => (
                 <StreamCard 

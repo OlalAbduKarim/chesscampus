@@ -284,12 +284,14 @@ const PlayArea: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col lg:flex-row overflow-hidden bg-dark-bg">
+    // Root: Scrollable on mobile, Fixed/Hidden on desktop
+    <div className="flex flex-col lg:flex-row h-full bg-dark-bg overflow-y-auto lg:overflow-hidden">
+      
       {/* LEFT: BOARD AREA */}
-      <div className="flex-1 flex flex-col relative overflow-y-auto lg:overflow-hidden">
+      <div className="flex-1 flex flex-col relative shrink-0 min-h-min">
           
-          {/* Mobile Status & Timers */}
-          <div className="lg:hidden p-3 bg-dark-surface border-b border-dark-border flex justify-between items-center sticky top-0 z-20 shadow-md">
+          {/* Mobile Status & Timers - Sticky */}
+          <div className="lg:hidden p-3 bg-dark-surface border-b border-dark-border flex justify-between items-center sticky top-0 z-30 shadow-md">
               <span className="font-bold text-sm text-white truncate max-w-[40%]">{gameStatus}</span>
               {isGameActive && (
                 <div className="flex gap-2">
@@ -320,7 +322,7 @@ const PlayArea: React.FC = () => {
                 </div>
 
                 {/* BOARD */}
-                <div className="w-full aspect-square shadow-2xl shadow-black rounded-lg overflow-hidden border-4 border-dark-surface relative group">
+                <div className="w-full aspect-square shadow-2xl shadow-black rounded-lg overflow-hidden border-4 border-dark-surface relative group z-0">
                     <Chessboard 
                         position={game.fen()} 
                         onPieceDrop={onDrop}
@@ -366,14 +368,14 @@ const PlayArea: React.FC = () => {
           </div>
       </div>
 
-      {/* RIGHT: CONTROLS & ANALYSIS */}
-      <div className="w-full lg:w-[380px] bg-dark-surface border-t lg:border-t-0 lg:border-l border-dark-border flex flex-col h-auto lg:h-full z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] lg:shadow-none">
+      {/* RIGHT: CONTROLS & ANALYSIS - Stacked bottom on mobile */}
+      <div className="w-full lg:w-[380px] bg-dark-surface border-t lg:border-t-0 lg:border-l border-dark-border flex flex-col h-auto lg:h-full z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] lg:shadow-none pb-20 lg:pb-0 shrink-0">
           <div className="p-4 md:p-5 border-b border-dark-border flex items-center gap-2 font-bold text-white">
               <Swords className="w-5 h-5 text-brand-500" />
               {isGameActive ? "Match Info" : "Game Setup"}
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 md:p-5 custom-scrollbar max-h-[40vh] lg:max-h-none">
+          <div className="flex-1 p-4 md:p-5 lg:overflow-y-auto custom-scrollbar">
               {isGameActive ? (
                   <div className="space-y-6">
                       {/* Status Box (Hidden Mobile - shown in top bar) */}
