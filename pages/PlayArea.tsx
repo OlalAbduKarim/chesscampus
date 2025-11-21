@@ -1,13 +1,13 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Chess } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
 import { 
     RotateCcw, Lightbulb, BrainCircuit, Swords, Trophy, 
-    AlertTriangle, Play, Clock, Flag, Undo, Activity, User
+    AlertTriangle, Play, Clock, Flag, Undo, Activity, User, Settings, X
 } from 'lucide-react';
 import { analyzeBoardPosition } from '../services/geminiService';
 import { stockfish, EngineEvaluation } from '../services/stockfish';
+import CustomDialog from '../components/CustomDialog';
 
 // --- TYPES ---
 
@@ -23,9 +23,9 @@ interface GameSettings {
 }
 
 const PRESETS: Record<GameMode, number> = {
-    'Easy': 2,
+    'Easy': 1,
     'Medium': 8,
-    'Hard': 14,
+    'Hard': 15,
     'Master': 20,
     'Custom': 10
 };
@@ -61,22 +61,22 @@ const Timer: React.FC<{ time: number | null; isActive: boolean; label: string }>
 const EvaluationBar: React.FC<{ evaluation: EngineEvaluation | null; isPlayerWhite: boolean }> = ({ evaluation, isPlayerWhite }) => {
     if (!evaluation) return null;
 
-    const whiteValue = evaluation.value;
-    const userValue = isPlayerWhite ? whiteValue : -whiteValue;
-    
+    const val = evaluation.value;
     let text = "";
     let colorClass = "text-slate-400";
 
     if (evaluation.type === 'mate') {
-        const mateIn = Math.abs(whiteValue);
-        const isGoodForUser = (whiteValue > 0) === isPlayerWhite;
+        const mateIn = Math.abs(val);
+        const isWhiteWinning = val > 0;
+        const isGoodForPlayer = isPlayerWhite ? isWhiteWinning : !isWhiteWinning;
         text = `M${mateIn}`;
-        colorClass = isGoodForUser ? "text-green-400" : "text-red-400";
+        colorClass = isGoodForPlayer ? "text-green-400" : "text-red-400";
     } else {
-        const score = (userValue / 100).toFixed(1);
-        const sign = userValue > 0 ? '+' : '';
+        const displayVal = isPlayerWhite ? val : -val;
+        const score = (displayVal / 100).toFixed(1);
+        const sign = displayVal > 0 ? '+' : '';
         text = `${sign}${score}`;
-        colorClass = userValue > 0 ? "text-green-400" : userValue < 0 ? "text-red-400" : "text-slate-400";
+        colorClass = displayVal > 0 ? "text-green-400" : displayVal < 0 ? "text-red-400" : "text-slate-400";
     }
 
     return (
@@ -90,11 +90,19 @@ const EvaluationBar: React.FC<{ evaluation: EngineEvaluation | null; isPlayerWhi
 // --- MAIN COMPONENT ---
 
 const PlayArea: React.FC = () => {
+  // Game State
   const [game, setGame] = useState(new Chess());
   const [history, setHistory] = useState<string[]>([]);
-  const [gameStatus, setGameStatus] = useState<string>('Not Started');
-  const [isGameActive, setIsGameActive] = useState(false);
+  const [gameStatus, setGameStatus] = useState<string>('Your Turn');
+  const [isGameActive, setIsGameActive] = useState(true); 
   
+  // Move Interaction State (for Click-to-Move)
+  const [moveFrom, setMoveFrom] = useState<string | null>(null);
+  const [optionSquares, setOptionSquares] = useState<Record<string, any>>({});
+
+  // Modal State
+  const [gameOverReason, setGameOverReason] = useState<string>("");
+
   // Settings
   const [settings, setSettings] = useState<GameSettings>({
       mode: 'Medium',
@@ -116,56 +124,257 @@ const PlayArea: React.FC = () => {
   const [whiteTime, setWhiteTime] = useState<number | null>(null);
   const [blackTime, setBlackTime] = useState<number | null>(null);
 
+  const gameRef = useRef(game);
+
+  // Sync ref for async callbacks
   useEffect(() => {
-    stockfish.init();
+      gameRef.current = game;
+  }, [game]);
+
+  // Initialize Stockfish & Auto-Start
+  useEffect(() => {
+    stockfish.init().catch(console.error);
+    
+    const newGame = new Chess();
+    setGame(newGame);
+    setIsGameActive(true);
+
     return () => stockfish.terminate();
   }, []);
 
-  // Timer
+  // Timer Logic
   useEffect(() => {
       if (!isGameActive || game.isGameOver() || settings.timeControl === 'Unlimited') return;
 
       const timer = setInterval(() => {
-          setWhiteTime(wt => {
-              if (game.turn() === 'w' && wt !== null && wt > 0) return wt - 1;
-              return wt;
-          });
-          setBlackTime(bt => {
-              if (game.turn() === 'b' && bt !== null && bt > 0) return bt - 1;
-              return bt;
-          });
+          if (game.turn() === 'w') {
+              setWhiteTime(t => {
+                  if (t !== null && t <= 0) {
+                      setIsGameActive(false);
+                      setGameStatus("Time's up! Black wins.");
+                      setGameOverReason("Time's up! Black wins.");
+                      return 0;
+                  }
+                  return t !== null ? t - 1 : t;
+              });
+          } else {
+              setBlackTime(t => {
+                  if (t !== null && t <= 0) {
+                      setIsGameActive(false);
+                      setGameStatus("Time's up! White wins.");
+                      setGameOverReason("Time's up! White wins.");
+                      return 0;
+                  }
+                  return t !== null ? t - 1 : t;
+              });
+          }
       }, 1000);
 
-      if ((whiteTime !== null && whiteTime <= 0) || (blackTime !== null && blackTime <= 0)) {
-          setIsGameActive(false);
-          setGameStatus(whiteTime === 0 ? "Time's up! Black wins." : "Time's up! White wins.");
-          clearInterval(timer);
-      }
-
       return () => clearInterval(timer);
-  }, [isGameActive, game.turn(), settings.timeControl, whiteTime, blackTime]);
+  }, [isGameActive, game.turn(), settings.timeControl]);
 
-  // Check game status
+  // Monitor Game Over
   useEffect(() => {
-      if (game.isCheckmate()) {
-          setGameStatus(game.turn() === actualPlayerColor ? "Checkmate! You lost." : "Checkmate! You won!");
+      if (game.isGameOver()) {
           setIsGameActive(false);
-      } else if (game.isDraw()) {
-          setGameStatus("Draw");
-          setIsGameActive(false);
-      } else if (game.isCheck()) {
-          setGameStatus("Check!");
+          setIsEngineThinking(false);
+          
+          if (game.isCheckmate()) {
+              const winner = game.turn() === 'w' ? 'Black' : 'White';
+              setGameOverReason(`Checkmate! ${winner} wins!`);
+              setGameStatus(`Checkmate! ${winner} wins!`);
+          } else if (game.isDraw()) {
+              setGameOverReason("Game Over: Draw");
+              setGameStatus("Draw");
+          } else if (game.isStalemate()) {
+              setGameOverReason("Game Over: Stalemate");
+              setGameStatus("Stalemate");
+          } else {
+              setGameOverReason("Game Over");
+              setGameStatus("Game Over");
+          }
       } else if (isGameActive) {
-          setGameStatus(game.turn() === actualPlayerColor ? "Your Turn" : "Stockfish Thinking...");
+          if (game.inCheck()) {
+             setGameStatus("Check!");
+          } else {
+             setGameStatus(game.turn() === actualPlayerColor ? "Your Turn" : "Stockfish Thinking...");
+          }
       }
   }, [game, isGameActive, actualPlayerColor]);
 
-  // Engine Move Trigger
+  // Trigger Engine Move
   useEffect(() => {
       if (isGameActive && !game.isGameOver() && game.turn() !== actualPlayerColor && !isEngineThinking) {
-          makeEngineMove();
+          const timeout = setTimeout(() => {
+              makeEngineMove();
+          }, 600);
+          return () => clearTimeout(timeout);
       }
   }, [game, isGameActive, actualPlayerColor]);
+
+  // --- CENTRALIZED MOVE LOGIC ---
+
+  const makeAMove = useCallback((moveData: { from: string; to: string; promotion?: string }) => {
+      const gameCopy = new Chess(game.fen());
+      let result = null;
+      
+      try {
+        result = gameCopy.move(moveData);
+      } catch (e) {
+        return null; // Illegal move
+      }
+      
+      if (result) {
+          setGame(gameCopy);
+          setHistory(prev => [...prev, result!.san]);
+          setAiAdvice(null);
+          
+          // Clear click-to-move state
+          setMoveFrom(null);
+          setOptionSquares({});
+          
+          return result;
+      }
+      return null;
+  }, [game]);
+
+  // --- USER INTERACTIONS ---
+
+  // 1. Drag and Drop Handler
+  const onDrop = (sourceSquare: string, targetSquare: string) => {
+      if (!isGameActive || game.turn() !== actualPlayerColor || isEngineThinking) return false;
+
+      const move = makeAMove({
+          from: sourceSquare,
+          to: targetSquare,
+          promotion: 'q',
+      });
+
+      return move !== null;
+  };
+
+  // 2. Click Square Handler (For Click-to-Move support on mobile)
+  const onSquareClick = (square: string) => {
+      if (!isGameActive || game.turn() !== actualPlayerColor || isEngineThinking) return;
+
+      // If clicking the same square, cancel selection
+      if (moveFrom === square) {
+          setMoveFrom(null);
+          setOptionSquares({});
+          return;
+      }
+
+      // If a piece is selected, try to move to the clicked square
+      if (moveFrom) {
+          const move = makeAMove({
+              from: moveFrom,
+              to: square,
+              promotion: 'q',
+          });
+
+          // If move was successful, we are done
+          if (move) return;
+          
+          // If move invalid, check if user clicked another one of their own pieces to switch selection
+          const piece = game.get(square as any);
+          if (piece && piece.color === game.turn()) {
+              setMoveFrom(square);
+              getMoveOptions(square);
+              return;
+          }
+
+          // Otherwise clear selection
+          setMoveFrom(null);
+          setOptionSquares({});
+          return;
+      }
+
+      // If no piece selected, select it if it belongs to player
+      const piece = game.get(square as any);
+      if (piece && piece.color === game.turn()) {
+          setMoveFrom(square);
+          getMoveOptions(square);
+      }
+  };
+
+  // Helper to highlight valid moves
+  const getMoveOptions = (square: string) => {
+      const moves = game.moves({ square, verbose: true });
+      if (moves.length === 0) {
+          setOptionSquares({});
+          return false;
+      }
+
+      const newSquares: Record<string, any> = {};
+      moves.forEach((move) => {
+          newSquares[move.to] = {
+              background: game.get(move.to as any) && game.get(move.to as any).color !== game.get(square as any).color
+                  ? 'radial-gradient(circle, rgba(255, 0, 0, 0.4) 85%, transparent 85%)' // Capture
+                  : 'radial-gradient(circle, rgba(255, 255, 255, 0.3) 25%, transparent 25%)', // Move
+              borderRadius: '50%'
+          };
+      });
+      
+      // Highlight selected square
+      newSquares[square] = { background: 'rgba(14, 165, 233, 0.4)' }; // Brand color
+      setOptionSquares(newSquares);
+      return true;
+  };
+
+  // --- ENGINE LOGIC ---
+
+  const makeEngineMove = () => {
+      setIsEngineThinking(true);
+      const fenWhenStarted = gameRef.current.fen();
+
+      // Safety timeout
+      const safetyTimeout = setTimeout(() => {
+          if (isEngineThinking && gameRef.current.fen() === fenWhenStarted) {
+              console.warn("Engine timeout - unlocking board");
+              setIsEngineThinking(false);
+              setGameStatus("Engine unresponsive. Try again.");
+          }
+      }, 8000);
+
+      stockfish.calculateBestMove(
+          fenWhenStarted,
+          settings.difficulty,
+          (bestMove) => {
+              clearTimeout(safetyTimeout);
+              
+              if (!isGameActive || gameRef.current.fen() !== fenWhenStarted) {
+                  setIsEngineThinking(false);
+                  return;
+              }
+
+              const from = bestMove.substring(0, 2);
+              const to = bestMove.substring(2, 4);
+              const promotion = bestMove.length > 4 ? bestMove.substring(4, 5) : undefined;
+              
+              setGame(prev => {
+                  const update = new Chess(prev.fen());
+                  try {
+                      const move = update.move({ from, to, promotion: promotion || 'q' });
+                      if (move) {
+                          setHistory(h => [...h, move.san]);
+                          return update;
+                      }
+                  } catch (e) {
+                      console.error("Illegal engine move:", bestMove);
+                  }
+                  return prev;
+              });
+              setIsEngineThinking(false);
+          },
+          (evalData) => {
+              if (gameRef.current.fen() === fenWhenStarted) {
+                  setEvaluation(evalData);
+              }
+          }
+      );
+  };
+
+  // --- ACTIONS ---
 
   const startGame = () => {
       const newGame = new Chess();
@@ -173,13 +382,11 @@ const PlayArea: React.FC = () => {
       setHistory([]);
       setAiAdvice(null);
       setEvaluation(null);
+      setGameOverReason("");
+      setMoveFrom(null);
+      setOptionSquares({});
       
-      let pColor: 'w' | 'b' = 'w';
-      if (settings.playerColor === 'random') {
-          pColor = Math.random() < 0.5 ? 'w' : 'b';
-      } else {
-          pColor = settings.playerColor as 'w' | 'b';
-      }
+      const pColor = settings.playerColor === 'random' ? (Math.random() < 0.5 ? 'w' : 'b') : settings.playerColor;
       setActualPlayerColor(pColor);
 
       const initialTime = TIME_CONTROLS[settings.timeControl];
@@ -188,91 +395,24 @@ const PlayArea: React.FC = () => {
 
       setIsGameActive(true);
       setGameStatus("Game Started");
-  };
-
-  const resetGame = () => {
-      setIsGameActive(false);
-      setGame(new Chess());
-      setHistory([]);
-      setGameStatus("New Game");
-      setEvaluation(null);
-      setAiAdvice(null);
-      stockfish.stop();
       setIsEngineThinking(false);
-  };
-
-  const onDrop = (source: string, target: string) => {
-      if (!isGameActive || game.turn() !== actualPlayerColor || isEngineThinking) return false;
-
-      const gameCopy = new Chess(game.fen());
-      let move = null;
-      try {
-          move = gameCopy.move({
-              from: source,
-              to: target,
-              promotion: 'q',
-          });
-      } catch (e) { return false; }
-
-      if (!move) return false;
-
-      setGame(gameCopy);
-      setHistory(prev => [...prev, move.san]);
-      setAiAdvice(null);
-      return true;
-  };
-
-  const makeEngineMove = () => {
-      setIsEngineThinking(true);
-      const currentTurn = game.turn(); 
-      const currentFen = game.fen(); 
-
-      stockfish.calculateBestMove(
-          currentFen,
-          settings.difficulty,
-          (bestMove) => {
-              const from = bestMove.substring(0, 2);
-              const to = bestMove.substring(2, 4);
-              const promotion = bestMove.length > 4 ? bestMove.substring(4, 5) : undefined;
-              
-              setGame((prev) => {
-                  const gameCopy = new Chess(prev.fen());
-                  try {
-                      const move = gameCopy.move({ from, to, promotion: promotion || 'q' });
-                      if (move) {
-                          setHistory(h => [...h, move.san]);
-                          return gameCopy;
-                      }
-                  } catch(e) {}
-                  return prev;
-              });
-              
-              setIsEngineThinking(false);
-          },
-          (evalData) => {
-              const multiplier = currentTurn === 'w' ? 1 : -1;
-              setEvaluation({
-                  type: evalData.type,
-                  value: evalData.value * multiplier
-              });
-          }
-      );
   };
 
   const handleUndo = () => {
       if (!isGameActive || isEngineThinking || history.length < 2) return;
-      setGame(g => {
-          const copy = new Chess(g.fen());
-          copy.undo(); // Engine
-          copy.undo(); // Player
-          return copy;
-      });
+      const gameCopy = new Chess(game.fen());
+      gameCopy.undo(); 
+      gameCopy.undo(); 
+      setGame(gameCopy);
       setHistory(prev => prev.slice(0, -2));
+      setEvaluation(null);
+      setMoveFrom(null);
+      setOptionSquares({});
   };
 
   const handleResign = () => {
       setIsGameActive(false);
-      setGameStatus("You resigned. Stockfish wins.");
+      setGameOverReason("You resigned. Stockfish wins.");
   };
 
   const handleAnalysis = async () => {
@@ -284,13 +424,12 @@ const PlayArea: React.FC = () => {
   };
 
   return (
-    // Root: Scrollable on mobile, Fixed/Hidden on desktop
     <div className="flex flex-col lg:flex-row h-full bg-dark-bg overflow-y-auto lg:overflow-hidden">
       
       {/* LEFT: BOARD AREA */}
       <div className="flex-1 flex flex-col relative shrink-0 min-h-min">
           
-          {/* Mobile Status & Timers - Sticky */}
+          {/* Mobile Status Bar */}
           <div className="lg:hidden p-3 bg-dark-surface border-b border-dark-border flex justify-between items-center sticky top-0 z-30 shadow-md">
               <span className="font-bold text-sm text-white truncate max-w-[40%]">{gameStatus}</span>
               {isGameActive && (
@@ -304,7 +443,7 @@ const PlayArea: React.FC = () => {
           <div className="flex-1 bg-dark-bg flex flex-col items-center p-4 relative">
             <div className="w-full md:max-w-[70vh] lg:max-w-[65vh] flex flex-col gap-3">
                 
-                {/* CPU Info (Desktop) */}
+                {/* Desktop Info Header */}
                 <div className="hidden lg:flex justify-between items-end px-1">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-slate-700 rounded-lg flex items-center justify-center border border-slate-600 shadow-sm">
@@ -321,11 +460,13 @@ const PlayArea: React.FC = () => {
                     </div>
                 </div>
 
-                {/* BOARD */}
-                <div className="w-full aspect-square shadow-2xl shadow-black rounded-lg overflow-hidden border-4 border-dark-surface relative group z-0">
+                {/* BOARD CONTAINER */}
+                <div className="w-full aspect-square shadow-2xl shadow-black rounded-lg overflow-hidden border-4 border-dark-surface relative group z-0 touch-none">
                     <Chessboard 
                         position={game.fen()} 
                         onPieceDrop={onDrop}
+                        onSquareClick={onSquareClick}
+                        customSquareStyles={optionSquares}
                         boardOrientation={actualPlayerColor === 'w' ? 'white' : 'black'}
                         arePiecesDraggable={isGameActive && !isEngineThinking && game.turn() === actualPlayerColor}
                         customDarkSquareStyle={{ backgroundColor: '#334155' }} 
@@ -334,24 +475,14 @@ const PlayArea: React.FC = () => {
                     />
                     
                     {isEngineThinking && (
-                        <div className="absolute top-2 right-2 z-10 flex items-center gap-2 bg-black/60 px-3 py-1.5 rounded-full backdrop-blur-sm border border-white/10 animate-in fade-in">
+                        <div className="absolute top-2 right-2 z-10 flex items-center gap-2 bg-black/60 px-3 py-1.5 rounded-full backdrop-blur-sm border border-white/10 animate-in fade-in pointer-events-none">
                             <div className="w-2 h-2 bg-brand-400 rounded-full animate-bounce"></div>
                             <span className="text-[10px] text-white font-bold tracking-wide">THINKING</span>
                         </div>
                     )}
-
-                    {game.isGameOver() && (
-                        <div className="absolute inset-0 bg-black/70 backdrop-blur-sm z-20 flex items-center justify-center animate-in fade-in">
-                            <div className="bg-dark-surface p-6 rounded-xl border border-dark-border shadow-2xl text-center">
-                                <Trophy className="w-12 h-12 text-brand-400 mx-auto mb-3" />
-                                <h2 className="text-xl font-bold text-white mb-1">{gameStatus}</h2>
-                                <button onClick={startGame} className="mt-4 px-6 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg font-bold text-sm">Play Again</button>
-                            </div>
-                        </div>
-                    )}
                 </div>
 
-                {/* Player Info (Desktop) */}
+                {/* Desktop Info Footer */}
                 <div className="hidden lg:flex justify-between items-start px-1">
                     <div className="flex items-center gap-3">
                          <div className="w-10 h-10 bg-brand-600 rounded-lg flex items-center justify-center border border-brand-500 shadow-lg">
@@ -368,7 +499,7 @@ const PlayArea: React.FC = () => {
           </div>
       </div>
 
-      {/* RIGHT: CONTROLS & ANALYSIS - Stacked bottom on mobile */}
+      {/* RIGHT: SETTINGS / INFO */}
       <div className="w-full lg:w-[380px] bg-dark-surface border-t lg:border-t-0 lg:border-l border-dark-border flex flex-col h-auto lg:h-full z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] lg:shadow-none pb-20 lg:pb-0 shrink-0">
           <div className="p-4 md:p-5 border-b border-dark-border flex items-center gap-2 font-bold text-white">
               <Swords className="w-5 h-5 text-brand-500" />
@@ -378,7 +509,7 @@ const PlayArea: React.FC = () => {
           <div className="flex-1 p-4 md:p-5 lg:overflow-y-auto custom-scrollbar">
               {isGameActive ? (
                   <div className="space-y-6">
-                      {/* Status Box (Hidden Mobile - shown in top bar) */}
+                      {/* Status */}
                       <div className="hidden lg:block bg-dark-bg rounded-xl p-4 border border-dark-border">
                           <div className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Status</div>
                           <div className="text-lg font-bold text-white">{gameStatus}</div>
@@ -404,10 +535,10 @@ const PlayArea: React.FC = () => {
                           </p>
                       </div>
 
-                      {/* Move History */}
+                      {/* History */}
                       <div className="bg-dark-bg rounded-xl border border-dark-border overflow-hidden flex flex-col h-32 md:h-48">
                            <div className="px-3 py-2 bg-dark-surface/50 border-b border-dark-border text-xs font-bold text-slate-500 uppercase">Move History</div>
-                           <div className="flex-1 overflow-y-auto p-2 font-mono text-sm">
+                           <div className="flex-1 overflow-y-auto p-2 font-mono text-sm" ref={(el) => el?.scrollTo(0, el.scrollHeight)}>
                                <div className="grid grid-cols-[30px_1fr_1fr] gap-y-1">
                                    {Array.from({ length: Math.ceil(history.length / 2) }).map((_, i) => (
                                        <React.Fragment key={i}>
@@ -420,23 +551,22 @@ const PlayArea: React.FC = () => {
                            </div>
                       </div>
                       
-                      {/* Game Actions */}
+                      {/* Actions */}
                       <div className="grid grid-cols-2 gap-3">
-                          <button onClick={handleUndo} className="p-3 bg-dark-bg hover:bg-dark-border border border-dark-border rounded-lg text-slate-300 text-sm font-bold transition-colors flex items-center justify-center gap-2">
+                          <button onClick={handleUndo} disabled={isEngineThinking} className="p-3 bg-dark-bg hover:bg-dark-border border border-dark-border rounded-lg text-slate-300 text-sm font-bold transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
                               <Undo className="w-4 h-4" /> Takeback
                           </button>
                           <button onClick={handleResign} className="p-3 bg-dark-bg hover:border-red-500/50 border border-dark-border rounded-lg text-red-400 hover:text-red-300 text-sm font-bold transition-colors flex items-center justify-center gap-2">
                               <Flag className="w-4 h-4" /> Resign
                           </button>
                       </div>
-                      <button onClick={resetGame} className="w-full p-3 mt-2 text-sm font-bold text-slate-400 hover:text-white transition-colors flex items-center justify-center gap-2">
-                          <RotateCcw className="w-4 h-4" /> New Game Setup
+                      <button onClick={() => setIsGameActive(false)} className="w-full p-3 mt-2 text-sm font-bold text-slate-400 hover:text-white transition-colors flex items-center justify-center gap-2">
+                          <Settings className="w-4 h-4" /> Change Settings
                       </button>
                   </div>
               ) : (
-                  /* SETUP SCREEN */
+                  /* SETUP PANEL */
                   <div className="space-y-8">
-                      {/* Difficulty */}
                       <div>
                           <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Difficulty</label>
                           <div className="grid grid-cols-2 gap-2">
@@ -451,21 +581,8 @@ const PlayArea: React.FC = () => {
                                   </button>
                               ))}
                           </div>
-                          <div className="mt-4 p-4 bg-dark-bg border border-dark-border rounded-lg">
-                              <div className="flex justify-between mb-2 text-xs font-bold text-slate-400">
-                                  <span>Custom Strength</span>
-                                  <span className="text-brand-400">{settings.difficulty}</span>
-                              </div>
-                              <input 
-                                type="range" min="0" max="20" 
-                                value={settings.difficulty} 
-                                onChange={(e) => setSettings(s => ({ ...s, mode: 'Custom', difficulty: parseInt(e.target.value) }))}
-                                className="w-full h-2 bg-dark-surface rounded-lg appearance-none cursor-pointer accent-brand-500"
-                              />
-                          </div>
                       </div>
 
-                      {/* Time Control */}
                       <div>
                           <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Time Control</label>
                           <div className="grid grid-cols-2 gap-2">
@@ -481,7 +598,6 @@ const PlayArea: React.FC = () => {
                           </div>
                       </div>
 
-                      {/* Play As */}
                       <div>
                           <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Play As</label>
                           <div className="flex bg-dark-bg p-1 rounded-lg border border-dark-border">
@@ -501,6 +617,18 @@ const PlayArea: React.FC = () => {
               )}
           </div>
       </div>
+
+      {/* Game Over Modal */}
+      <CustomDialog 
+        open={!!gameOverReason} 
+        title="Game Over" 
+        contentText={gameOverReason} 
+        handleContinue={() => {
+          setGameOverReason("");
+          setIsGameActive(false);
+        }}
+      />
+
     </div>
   );
 };

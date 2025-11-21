@@ -6,7 +6,7 @@ import { Chessboard } from 'react-chessboard';
 import { rtdb } from '../services/firebase';
 import { ref, onValue, set } from 'firebase/database';
 
-const SESSION_ID = "demo-session-123"; // In real app, this comes from URL param
+const SESSION_ID = "demo-session-123";
 
 const PrivateLesson: React.FC = () => {
   const [game, setGame] = useState(new Chess());
@@ -20,11 +20,12 @@ const PrivateLesson: React.FC = () => {
     const unsubscribe = onValue(boardRef, (snapshot) => {
         const fen = snapshot.val();
         if (fen) {
-            // Only update if different to prevent loops
-            const currentFen = game.fen();
-            if (fen !== currentFen) {
-                setGame(new Chess(fen));
-            }
+            setGame((currentG) => {
+                if (currentG.fen() !== fen) {
+                    return new Chess(fen);
+                }
+                return currentG;
+            });
         }
     });
 
@@ -32,21 +33,23 @@ const PrivateLesson: React.FC = () => {
   }, []);
 
   function onDrop(sourceSquare: string, targetSquare: string) {
+    let move = null;
+    const gameCopy = new Chess(game.fen());
+    
     try {
-      const gameCopy = new Chess(game.fen());
-      const result = gameCopy.move({
+      move = gameCopy.move({
         from: sourceSquare,
         to: targetSquare,
         promotion: 'q',
       });
-      
-      if (result) {
-        setGame(gameCopy);
-        // Push new FEN to Realtime DB
-        set(ref(rtdb, `lessons/${SESSION_ID}/fen`), gameCopy.fen());
-        return true;
-      }
     } catch (e) { return false; }
+      
+    if (move) {
+      setGame(gameCopy);
+      // Push new FEN to Realtime DB
+      set(ref(rtdb, `lessons/${SESSION_ID}/fen`), gameCopy.fen());
+      return true;
+    }
     return false;
   }
 
@@ -63,9 +66,9 @@ const PrivateLesson: React.FC = () => {
       </header>
 
       <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0">
-        {/* Board Area */}
+        {/* Board Area - Touch Action None to prevent scroll */}
         <div className="flex-1 bg-dark-surface rounded-2xl shadow-inner border border-dark-border flex items-center justify-center p-4 min-h-[400px]">
-             <div className="h-full max-h-[600px] aspect-square">
+             <div className="h-full max-h-[600px] aspect-square touch-none">
                 <Chessboard 
                     position={game.fen()} 
                     onPieceDrop={onDrop}
@@ -75,6 +78,7 @@ const PrivateLesson: React.FC = () => {
                     }}
                     customDarkSquareStyle={{ backgroundColor: '#475569' }}
                     customLightSquareStyle={{ backgroundColor: '#cbd5e1' }}
+                    animationDuration={200}
                 />
              </div>
         </div>

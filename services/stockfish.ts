@@ -14,19 +14,31 @@ class StockfishService {
         if (this.worker) return;
 
         try {
-            // Using importScripts in a Blob allows loading the worker file from a different origin
-            // correctly while maintaining the worker context.
-            // Important: Do not overwrite self.onmessage here, as Stockfish.js sets up its own listener.
+            // Create a local worker script that imports the engine.
+            // This bypasses strict CORS on Worker constructors by running same-origin code first.
             const workerScript = `
-                importScripts('${STOCKFISH_URL}');
+                try {
+                    importScripts('${STOCKFISH_URL}');
+                } catch (e) {
+                    self.postMessage('error:import_failed');
+                }
             `;
+            
             const blob = new Blob([workerScript], { type: 'application/javascript' });
-            this.worker = new Worker(URL.createObjectURL(blob));
+            const blobUrl = URL.createObjectURL(blob);
+
+            this.worker = new Worker(blobUrl);
             
             this.worker.onmessage = (e) => {
                 if (e.data === 'readyok') {
                     this.isReady = true;
+                } else if (e.data === 'error:import_failed') {
+                    console.error("Stockfish failed to load in worker.");
                 }
+            };
+
+            this.worker.onerror = (err) => {
+                console.error("Stockfish Worker Error:", err);
             };
 
             this.worker.postMessage('uci');
@@ -43,8 +55,6 @@ class StockfishService {
     ) {
         if (!this.worker) {
             this.init().then(() => {
-                // If initialization succeeded, try again. 
-                // If not, we can't do anything.
                 if(this.worker) this.calculateBestMove(fen, level, onMove, onEvaluation);
             });
             return;
@@ -52,24 +62,19 @@ class StockfishService {
 
         const skill = Math.min(20, Math.max(0, level));
         
-        // Configure
         this.worker.postMessage(`setoption name Skill Level value ${skill}`);
         this.worker.postMessage(`position fen ${fen}`);
         
-        // Time management
         const depth = skill < 5 ? 5 : skill < 15 ? 12 : 18;
         const moveTime = skill < 5 ? 500 : skill < 15 ? 1000 : 2000;
 
         this.worker.postMessage(`go depth ${depth} movetime ${moveTime}`);
 
-        // Cleanup safety
-        let timeoutId: any;
-
         const listener = (e: MessageEvent) => {
             const line = e.data;
             if (typeof line !== 'string') return;
 
-            // Eval
+            // Parse Evaluation
             if (line.startsWith('info') && onEvaluation && line.includes('score')) {
                 const scoreMatch = line.match(/score (cp|mate) (-?\d+)/);
                 if (scoreMatch) {
@@ -79,29 +84,20 @@ class StockfishService {
                 }
             }
 
-            // Best Move
+            // Parse Best Move
             if (line.startsWith('bestmove')) {
                 const parts = line.split(' ');
                 const move = parts[1];
                 
                 this.worker?.removeEventListener('message', listener);
-                clearTimeout(timeoutId);
                 
                 if (move && move !== '(none)') {
                     onMove(move);
-                } else {
-                    // Fallback if engine returns nothing/none (e.g. mate)
                 }
             }
         };
 
         this.worker.addEventListener('message', listener);
-
-        // Safety timeout to prevent hanging if engine crashes
-        timeoutId = setTimeout(() => {
-            this.worker?.removeEventListener('message', listener);
-            // console.warn("Stockfish timeout");
-        }, moveTime + 2000);
     }
 
     stop() {
